@@ -1,2 +1,2 @@
-// Package errors will contain typed errors and user-visible error mapping.
+// Package errors defines typed errors and helpers for mapping exec and MCP failures.
 package errors
