@@ -4,6 +4,10 @@ import (
 	"testing"
 )
 
+func intPtr(v int) *int {
+	return &v
+}
+
 func TestBuildDiffNoIndexArgs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -25,11 +29,23 @@ func TestBuildDiffNoIndexArgs(t *testing.T) {
 			},
 		},
 		{
+			name:  "unified_zero",
+			left:  "/a",
+			right: "/b",
+			opts: DiffNoIndexOptions{
+				Unified: intPtr(0),
+			},
+			want: []string{
+				"diff", "--no-index", "--unified=0",
+				"--", "/a", "/b",
+			},
+		},
+		{
 			name:  "custom_unified",
 			left:  "/a",
 			right: "/b",
 			opts: DiffNoIndexOptions{
-				UnifiedCtx: 7,
+				Unified: intPtr(7),
 			},
 			want: []string{
 				"diff", "--no-index", "--unified=7",
@@ -41,8 +57,8 @@ func TestBuildDiffNoIndexArgs(t *testing.T) {
 			left:  "/a",
 			right: "/b",
 			opts: DiffNoIndexOptions{
-				UnifiedCtx: 5,
-				Ignore:     IgnoreWhitespaceAll,
+				Unified: intPtr(5),
+				Ignore:  IgnoreWhitespaceAll,
 			},
 			want: []string{
 				"diff", "--no-index", "--unified=5",
@@ -67,14 +83,14 @@ func TestBuildDiffNoIndexArgs(t *testing.T) {
 			name:    "unified_too_large",
 			left:    "/a",
 			right:   "/b",
-			opts:    DiffNoIndexOptions{UnifiedCtx: 500},
+			opts:    DiffNoIndexOptions{Unified: intPtr(500)},
 			wantErr: true,
 		},
 		{
 			name:    "unified_negative",
 			left:    "/a",
 			right:   "/b",
-			opts:    DiffNoIndexOptions{UnifiedCtx: -1},
+			opts:    DiffNoIndexOptions{Unified: intPtr(-1)},
 			wantErr: true,
 		},
 		{

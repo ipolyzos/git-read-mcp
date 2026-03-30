@@ -12,6 +12,7 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	gitreadmcp "github.com/ipolyzos/git-read-mcp/internal/mcp"
+	"github.com/ipolyzos/git-read-mcp/internal/mcp/handlers"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 
 	reg := gitreadmcp.NewRegistry()
 	impl := &mcpsdk.Implementation{Name: "git-read-mcp", Version: version()}
-	if err := gitreadmcp.RunStdio(ctx, impl, reg); err != nil && !errors.Is(err, context.Canceled) {
+	if err := gitreadmcp.RunStdio(ctx, impl, reg, handlers.InstallBuiltins); err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatalf("server stopped: %v", err)
 	}
 }

@@ -23,10 +23,10 @@ const (
 // DiffNoIndexOptions configures git diff --no-index invocation. Only allowlisted flags
 // are ever passed; user strings never become flags.
 type DiffNoIndexOptions struct {
-	// UnifiedCtx is the argument to --unified=<n>. Zero selects the default of 3 lines.
-	UnifiedCtx int
-	Ignore     IgnoreWhitespace
-	Timeout    time.Duration
+	// Unified sets --unified=n. Nil means 3 lines of context; explicit 0 is allowed.
+	Unified *int
+	Ignore  IgnoreWhitespace
+	Timeout time.Duration
 	// MaxOutputBytes caps captured stdout+stderr combined. Zero selects a default cap; negative means unlimited.
 	MaxOutputBytes int64
 }
@@ -106,16 +106,23 @@ func validatePathArg(name, p string) error {
 	return nil
 }
 
-func buildDiffNoIndexArgs(left, right string, opts DiffNoIndexOptions) ([]string, error) {
-	ctxN := opts.UnifiedCtx
-	if ctxN == 0 {
-		ctxN = 3
+func unifiedValue(u *int) (int, error) {
+	if u == nil {
+		return 3, nil
 	}
-	if ctxN < 0 || ctxN > maxUnifiedLines {
-		return nil, fmt.Errorf("git: unified context %d out of range [0,%d]", ctxN, maxUnifiedLines)
+	if *u < 0 || *u > maxUnifiedLines {
+		return 0, fmt.Errorf("git: unified context %d out of range [0,%d]", *u, maxUnifiedLines)
+	}
+	return *u, nil
+}
+
+func buildDiffNoIndexArgs(left, right string, opts DiffNoIndexOptions) ([]string, error) {
+	n, err := unifiedValue(opts.Unified)
+	if err != nil {
+		return nil, err
 	}
 
-	args := []string{"diff", "--no-index", "--unified=" + strconv.Itoa(ctxN)}
+	args := []string{"diff", "--no-index", "--unified=" + strconv.Itoa(n)}
 	switch opts.Ignore {
 	case IgnoreWhitespaceNone:
 	case IgnoreWhitespaceAll:
