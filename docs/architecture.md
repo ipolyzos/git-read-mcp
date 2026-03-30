@@ -37,7 +37,7 @@ Two complementary mechanisms exist:
 | Mechanism | Role |
 |-----------|------|
 | **`mcp.Registry`** | In-process map of **`ToolMeta` + `ToolHandler`**; **`InstallTools`** registers each with **`Server.AddTool`** (low-level handler). Used when you extend the server with custom tools before **`RunStdio`**. |
-| **`handlers.InstallBuiltins`** | Calls **`mcpsdk.AddTool`** with typed **`ToolHandlerFor`** implementations: `diff_files`, `diff_directories`, `summarize_diff`. Input schema, unmarshaling, and structured output are handled by the SDK. |
+| **`handlers.InstallBuiltins`** | Calls **`mcpsdk.AddTool`** with typed **`ToolHandlerFor`** implementations: `diff_files`, `diff_directories`, `summarize_diff`, `compare_text`. Input schema, unmarshaling, and structured output are handled by the SDK. |
 
 ```
   Registry (optional)          Built-ins installer

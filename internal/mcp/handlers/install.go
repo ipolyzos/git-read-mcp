@@ -25,5 +25,9 @@ func InstallBuiltins(srv *mcpsdk.Server) error {
 		Name:        apimcp.ToolNameSummarizeDiff,
 		Description: "Summarize a unified diff: file list, approximate +/- lines and hunk counts. Pass diff text or repo_path+left_path+right_path (same rules as diff_files) to compute via git diff --no-index.",
 	}, HandleSummarizeDiff)
+	mcpsdk.AddTool(srv, &mcpsdk.Tool{
+		Name:        apimcp.ToolNameCompareText,
+		Description: "Compare two text blobs in memory via git diff --no-index (read-only). repo_path is validated for context only; operands are written to a temp directory, not under the repo.",
+	}, HandleCompareText)
 	return nil
 }
