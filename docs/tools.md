@@ -24,7 +24,7 @@ Handlers use the SDK’s low-level type `mcpsdk.ToolHandler`:
 func(context.Context, *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error)
 ```
 
-Built-in tools (`diff_files`, `diff_directories`, …) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
+Built-in tools (`diff_files`, `diff_directories`, `summarize_diff`, …) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
 
 ## Result envelope helpers
 
@@ -137,11 +137,76 @@ Here `repo_path` still must be a valid directory (anchor for resolution); the co
 - Wider filesystem reach than `diff_files` by design—only use absolute paths when you trust their source; relative paths stay anchored to `repo_path`.
 - Very large trees can produce huge diffs; default subprocess output caps apply (`internal/git` / `execx`); `truncated` is set when the cap is hit.
 
+## Tool: `summarize_diff`
+
+**Name:** `summarize_diff`
+
+**Purpose:** Produce a **short summary** plus **structured per-file stats** from a **unified diff**. Either pass raw diff text or the same path triple as `diff_files` so the server runs `git diff --no-index` and parses the result.
+
+### Inputs (JSON)
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `diff` | string (optional) | Inline unified diff. If non-empty (after trim), **path fields are ignored**. |
+| `repo_path` | string | Required when `diff` is empty: repository root (see `diff_files`). |
+| `left_path` | string | Required with `repo_path` when computing: left file, repo-scoped. |
+| `right_path` | string | Required with `repo_path` when computing: right file, repo-scoped. |
+| `context_lines` | int | `0`–`50` when computing (same as `diff_files`). |
+| `ignore_whitespace` | string (optional) | When computing: `none` / `all` / `change`. |
+| `max_diff_bytes` | int (optional) | Max bytes fed to the parser (default 2 MiB, hard cap 8 MiB). Inline `diff` **longer** than the effective cap is rejected before parsing. |
+| `max_files` | int (optional) | Stop collecting after this many files (default 500, hard cap 10 000). |
+| `max_hunks` | int (optional) | Stop after this many hunks **total** across files (default 10 000, hard cap 100 000). |
+
+### Outputs (structured)
+
+| Field | Meaning |
+|-------|---------|
+| `summary` | One-line narrative: file count, approximate `+`/`-` lines, hunk count, source mode, truncation flags. |
+| `files` | List of `{ path, old_path?, rename?, binary?, insertions, deletions, hunks }`. |
+| `totals` | Rolled-up `files`, `insertions`, `deletions`, `hunks`. |
+| `diff_source` | `"inline"` or `"computed"`. |
+| `input_truncated` | Diff text was sliced to `max_diff_bytes` before parsing. |
+| `parse_truncated` | Parsing stopped early because `max_files` or `max_hunks` was hit. |
+| `git_diff_truncated` | Git subprocess output hit the output byte cap (same as `diff_files` `truncated`). Partial diff is still summarized when possible. |
+
+### Examples
+
+Inline diff:
+
+```json
+{
+  "diff": "diff --git a/foo.go b/foo.go\n--- a/foo.go\n+++ b/foo.go\n@@ -1 +1 @@\n-old\n+new\n"
+}
+```
+
+Computed (equivalent policy to `diff_files`):
+
+```json
+{
+  "repo_path": "/home/you/project",
+  "left_path": "pkg/old.go",
+  "right_path": "pkg/new.go",
+  "context_lines": 3,
+  "max_hunks": 5000
+}
+```
+
+### Limitations
+
+- **Counts are approximate**: they come from a line scan over unified diff text (like counting `+`/`-` in hunks, excluding `+++` / `---` lines). They are not a full Git numstat.
+- **Renames** are detected best-effort from `diff --git`, `rename from` / `rename to`, and `---` / `+++` headers; unusual formats may mis-label paths.
+- **Binary files**: lines of the form `Binary files … differ` mark the file as binary with **no** line-level insertions/deletions.
+- **Truncation**: `input_truncated` / `parse_truncated` / `git_diff_truncated` mean the summary may be **incomplete**; callers should not assume full coverage without checking those flags.
+
+### Safety
+
+- **Path mode** inherits the same containment and argv discipline as `diff_files` (no shell; operands only after `--`).
+- Inline mode parses **only** the supplied string (capped by `max_diff_bytes` for parsing); oversized inline input is rejected up front.
+
 ## Validation rules (other planned tools)
 
 | Tool / mode | Path policy |
 |-------------|-------------|
-| **`summarize_diff` (file mode)** | Same as `diff_files`: within repo, files must exist. |
 | **`compare_text`** | Operates on temporary/buffer-backed inputs supplied by the host; **no repo containment** on those payloads beyond verifying `repo_path` exists (for context) via `NormalizeRepoPath`. Do not accept user filesystem paths for compare blobs. |
 
 Cross-cutting limits (description length, integer bounds, booleans) should use `internal/validate` helpers so MCP schemas and runtime checks stay aligned.
