@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipolyzos/git-read-mcp/internal/config"
 	gerr "github.com/ipolyzos/git-read-mcp/internal/errors"
 	"github.com/ipolyzos/git-read-mcp/internal/execx"
 )
@@ -60,13 +61,22 @@ func DiffNoIndex(ctx context.Context, left, right string, opts DiffNoIndexOption
 		return nil, err
 	}
 
+	cfg := config.Get()
 	timeout := opts.Timeout
 	if timeout <= 0 {
-		timeout = defaultDiffTimeout
+		if cfg.DiffTimeout > 0 {
+			timeout = cfg.DiffTimeout
+		} else {
+			timeout = defaultDiffTimeout
+		}
 	}
 	maxBytes := opts.MaxOutputBytes
 	if maxBytes == 0 {
-		maxBytes = defaultDiffMaxBytes
+		if cfg.MaxOutputBytes > 0 {
+			maxBytes = cfg.MaxOutputBytes
+		} else {
+			maxBytes = defaultDiffMaxBytes
+		}
 	}
 
 	res, err := execx.Run(ctx, "git", args, EnvGitReadOnly(), "", timeout, maxBytes)

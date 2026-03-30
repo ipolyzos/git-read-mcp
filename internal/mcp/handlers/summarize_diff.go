@@ -16,7 +16,7 @@ import (
 // HandleSummarizeDiff parses a unified diff or computes one like diff_files, then returns structured stats.
 func HandleSummarizeDiff(ctx context.Context, req *mcpsdk.CallToolRequest, in apimcp.SummarizeDiffInput) (*mcpsdk.CallToolResult, apimcp.SummarizeDiffOutput, error) {
 	if err := apimcp.ValidateSummarizeDiffInput(in); err != nil {
-		return nil, apimcp.SummarizeDiffOutput{}, err
+		return nil, apimcp.SummarizeDiffOutput{}, mapToolError(apimcp.ToolNameSummarizeDiff, req, err)
 	}
 
 	opts := apimcp.SummarizeDiffOptions(in)
@@ -35,12 +35,12 @@ func HandleSummarizeDiff(ctx context.Context, req *mcpsdk.CallToolRequest, in ap
 		IgnoreWhitespace: in.IgnoreWhitespace,
 	})
 	if err != nil {
-		return nil, apimcp.SummarizeDiffOutput{}, err
+		return nil, apimcp.SummarizeDiffOutput{}, mapToolError(apimcp.ToolNameSummarizeDiff, req, err)
 	}
 
 	ignore, err := apimcp.ParseIgnoreWhitespace(in.IgnoreWhitespace)
 	if err != nil {
-		return nil, apimcp.SummarizeDiffOutput{}, err
+		return nil, apimcp.SummarizeDiffOutput{}, mapToolError(apimcp.ToolNameSummarizeDiff, req, err)
 	}
 
 	ctxN := in.ContextLines
@@ -59,7 +59,7 @@ func HandleSummarizeDiff(ctx context.Context, req *mcpsdk.CallToolRequest, in ap
 		if errors.Is(err, gerr.ErrExecTruncated) {
 			gitTrunc = true
 		} else {
-			return nil, apimcp.SummarizeDiffOutput{}, err
+			return nil, apimcp.SummarizeDiffOutput{}, mapToolError(apimcp.ToolNameSummarizeDiff, req, err)
 		}
 	}
 
