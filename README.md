@@ -1,5 +1,8 @@
 # git-read-mcp
 
+[![CI](https://github.com/ipolyzos/git-read-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ipolyzos/git-read-mcp/actions/workflows/ci.yml)
+[![Docs](https://github.com/ipolyzos/git-read-mcp/actions/workflows/docs.yml/badge.svg)](https://github.com/ipolyzos/git-read-mcp/actions/workflows/docs.yml)
+
 A **read-only** [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server over **stdio** for inspecting Git history and diffs safely from AI tooling.
 
 ## What it does
