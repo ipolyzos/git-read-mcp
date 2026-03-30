@@ -24,7 +24,7 @@ Handlers use the SDK’s low-level type `mcpsdk.ToolHandler`:
 func(context.Context, *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error)
 ```
 
-Built-in tools (`diff_files`, `diff_directories`, `summarize_diff`, …) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
+Built-in tools (`diff_files`, `diff_directories`, `summarize_diff`, `compare_text`) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
 
 ## Result envelope helpers
 
@@ -330,8 +330,50 @@ Computed (equivalent policy to `diff_files`):
 | **Errors** | Parse tool error JSON **`code`** for recovery (`NOT_FOUND` vs `TIMEOUT` vs `GIT_ERROR`). |
 | **Secrets** | Do not paste tokens into **`repo_path`** or path fields if logs or error messages might echo them. |
 
-## Other tools (`compare_text`)
+## Tool: `compare_text`
 
-The **`compare_text`** handler compares in-memory strings via a temp dir + `git diff --no-index`. It may not be registered in all builds; when present, **`repo_path`** is validated for context only—payloads are not written under the repo. Arguments and limits are defined in **`internal/mcp/compare_text_schema.go`** (`left_text` / `right_text` caps, `context_lines`, `ignore_whitespace`). Same subprocess and truncation semantics as other diff tools.
+**Name:** `compare_text`
+
+**Purpose:** Compare two **text blobs** in memory using `git diff --no-index`. Payloads are written to a **temporary directory** (fixed filenames `left.txt` / `right.txt`); **`repo_path`** is validated with **`NormalizeRepoPath`** for caller context only—**nothing is written under `repo_path`**.
+
+### Inputs (JSON)
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `repo_path` | string | Required; must exist as a directory (context anchor). |
+| `left_text` | string | Required; max **200 KiB** UTF-8 per operand (`MaxCompareTextBytes`). |
+| `right_text` | string | Required; same cap. |
+| `context_lines` | int | `0`–`50` (`--unified`). |
+| `ignore_whitespace` | string (optional) | Same as `diff_files`: `none` / `all` / `change`. |
+
+### Outputs (structured)
+
+Same shape as `diff_files`: `diff`, `truncated`, `had_diff`, `stats` (stats omitted when truncated in the handler).
+
+### Example arguments
+
+```json
+{
+  "name": "compare_text",
+  "arguments": {
+    "repo_path": "/home/you/project",
+    "left_text": "hello\nworld\n",
+    "right_text": "hello\ngalaxy\n",
+    "context_lines": 3,
+    "ignore_whitespace": "none"
+  }
+}
+```
+
+### Limitations and practices
+
+- **Size**: operands larger than **200 KiB** are rejected before any temp write.
+- **Secrets**: avoid sending credentials in `left_text` / `right_text` if logs or error paths might retain them.
+- **Temp cleanup**: `defer os.RemoveAll`; abrupt process exit can leave temp dirs until the OS reclaims them.
+
+### Safety
+
+- Same argv discipline as other diff tools: allowlisted `git diff --no-index` only; no shell.
+- See [security.md](security.md) for temp-file details.
 
 Cross-cutting limits (string byte caps, integer bounds) use **`internal/validate`** helpers so MCP schemas and runtime checks stay aligned.

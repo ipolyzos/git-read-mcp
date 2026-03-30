@@ -14,6 +14,7 @@ The server exposes **read-only** MCP tools over stdio, backed by allowlisted `gi
 | **`diff_files`** | Unified diff between two **files** under a repo root (paths must stay inside `repo_path`). |
 | **`diff_directories`** | Unified diff between two **directory trees** (absolute dirs may lie outside `repo_path`). |
 | **`summarize_diff`** | Short summary + per-file stats from an inline unified diff **or** the same file pair as `diff_files`. |
+| **`compare_text`** | Unified diff between two **strings** (`left_text` / `right_text`, capped); `repo_path` is context-only—blobs use a temp dir, not the repo tree. |
 
 See **[docs/tools.md](docs/tools.md)** for parameters, limits, and security notes.
 

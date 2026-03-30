@@ -110,7 +110,7 @@ Large **responses** still consume **MCP client/host** memory when structured con
 
 ## Temporary files (`compare_text`)
 
-The **`compare_text`** handler (**`internal/mcp/handlers/compare_text.go`**) materializes operands on disk for `git diff --no-index`. Core builds may or may not register it in **`InstallBuiltins`**; when exposed to clients, the same properties apply:
+The **`compare_text`** handler (**`internal/mcp/handlers/compare_text.go`**) materializes operands on disk for `git diff --no-index`. It is registered in **`InstallBuiltins`**; the same properties apply:
 
 | Topic | Mitigation |
 |-------|------------|
