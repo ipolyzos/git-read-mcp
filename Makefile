@@ -3,6 +3,9 @@
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/git-read-mcp
 
+# Reproducible-friendly defaults (match release workflow; CGO off for portable binary).
+GO_BUILD_FLAGS := -trimpath -buildvcs=false
+
 fmt:
 	go fmt ./...
 
@@ -16,7 +19,7 @@ build: $(BINARY)
 
 $(BINARY):
 	mkdir -p $(BIN_DIR)
-	go build -o $(BINARY) ./cmd/server
+	CGO_ENABLED=0 go build $(GO_BUILD_FLAGS) -o $(BINARY) ./cmd/server
 
 clean:
 	rm -rf $(BIN_DIR)
