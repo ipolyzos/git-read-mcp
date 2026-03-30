@@ -27,7 +27,7 @@ Details will live in `docs/security.md` as behavior is implemented.
 
 ## Development quickstart
 
-Prerequisites: [Go](https://go.dev/dl/) 1.22+.
+Prerequisites: [Go](https://go.dev/dl/) 1.25+ (required by the official MCP Go SDK).
 
 ```bash
 go test ./...
