@@ -24,7 +24,7 @@ Handlers use the SDK’s low-level type `mcpsdk.ToolHandler`:
 func(context.Context, *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error)
 ```
 
-Built-in tools (for example `diff_files`) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` (for example `DiffFilesInput` / `DiffFilesOutput`) so JSON schema is inferred by the SDK.
+Built-in tools (`diff_files`, `diff_directories`, …) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
 
 ## Result envelope helpers
 
@@ -83,12 +83,65 @@ Relative paths are resolved with `ResolvePath`; both sides must pass `EnsureWith
 - Git environment uses pager suppression and `GIT_TERMINAL_PROMPT=0` (see `internal/git` and `docs/architecture.md`).
 - Truncation returns a tool success with `truncated: true` and partial `diff`; timeouts and unexpected git exits surface as errors.
 
+## Tool: `diff_directories`
+
+**Name:** `diff_directories`  
+
+**Purpose:** Read-only recursive comparison of two **directories** using `git diff --no-index`. Git walks both trees and emits a unified diff (requires a Git version that supports directory operands with `--no-index`, e.g. recent 2.x).
+
+### Inputs (JSON)
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `repo_path` | string | Must exist as a directory; used to resolve **relative** `left_dir` / `right_dir`. |
+| `left_dir` | string | Relative to `repo_path` or absolute path to a directory. |
+| `right_dir` | string | Same as `left_dir`. |
+| `context_lines` | int | `0`–`50` (`--unified`). |
+| `ignore_whitespace` | string (optional) | Same semantics as `diff_files` (`none` / `all` / `change`). |
+
+Relative paths are joined against `repo_path` via `ResolvePath`. **There is no `EnsureWithinRepo` check**: absolute paths may point outside the repository, but both operands must exist and be **directories** (`EnsurePathExists(..., true)`).
+
+### Outputs (structured)
+
+Same shape as `diff_files`: `diff`, `truncated`, `had_diff`, `stats` (stats omitted when output is truncated in the handler).
+
+### Example: relative trees inside a repo
+
+```json
+{
+  "repo_path": "/home/you/project",
+  "left_dir": "baseline/pkg",
+  "right_dir": "current/pkg",
+  "context_lines": 3,
+  "ignore_whitespace": "none"
+}
+```
+
+### Example: absolute directories (e.g. two clones)
+
+```json
+{
+  "repo_path": "/home/you/project",
+  "left_dir": "/tmp/checkout-a",
+  "right_dir": "/tmp/checkout-b",
+  "context_lines": 3,
+  "ignore_whitespace": "change"
+}
+```
+
+Here `repo_path` still must be a valid directory (anchor for resolution); the compared trees live at the absolute paths.
+
+### Safety
+
+- Same argv discipline as `diff_files`: no shell; operands appear only after `--`.
+- Wider filesystem reach than `diff_files` by design—only use absolute paths when you trust their source; relative paths stay anchored to `repo_path`.
+- Very large trees can produce huge diffs; default subprocess output caps apply (`internal/git` / `execx`); `truncated` is set when the cap is hit.
+
 ## Validation rules (other planned tools)
 
 | Tool / mode | Path policy |
 |-------------|-------------|
 | **`summarize_diff` (file mode)** | Same as `diff_files`: within repo, files must exist. |
-| **`diff_directories`** | Paths may target arbitrary directories, but **`EnsurePathExists(dir, true)`** must succeed after resolution. Default: resolve relative paths with `ResolvePath`; absolute paths are accepted as-is after cleaning, **without** `EnsureWithinRepo`, so callers can compare directories outside the repo when explicitly specified. |
 | **`compare_text`** | Operates on temporary/buffer-backed inputs supplied by the host; **no repo containment** on those payloads beyond verifying `repo_path` exists (for context) via `NormalizeRepoPath`. Do not accept user filesystem paths for compare blobs. |
 
 Cross-cutting limits (description length, integer bounds, booleans) should use `internal/validate` helpers so MCP schemas and runtime checks stay aligned.
