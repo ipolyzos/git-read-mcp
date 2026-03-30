@@ -8,8 +8,9 @@ import (
 )
 
 // RunStdio builds an MCP server for the given implementation, installs tools from
-// reg, and serves on stdin/stdout until context cancellation or transport error.
-func RunStdio(ctx context.Context, impl *mcpsdk.Implementation, reg *Registry) error {
+// reg, runs optional installers (for example builtin MCP tools), then serves on
+// stdin/stdout until context cancellation or transport error.
+func RunStdio(ctx context.Context, impl *mcpsdk.Implementation, reg *Registry, installers ...func(*mcpsdk.Server) error) error {
 	if impl == nil {
 		return fmt.Errorf("implementation is required")
 	}
@@ -19,6 +20,14 @@ func RunStdio(ctx context.Context, impl *mcpsdk.Implementation, reg *Registry) e
 	srv := mcpsdk.NewServer(impl, nil)
 	if err := InstallTools(srv, reg); err != nil {
 		return err
+	}
+	for _, install := range installers {
+		if install == nil {
+			continue
+		}
+		if err := install(srv); err != nil {
+			return err
+		}
 	}
 	return srv.Run(ctx, &mcpsdk.StdioTransport{})
 }
