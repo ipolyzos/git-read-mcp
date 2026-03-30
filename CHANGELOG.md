@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-30
+
+### Added
+- Added GitHub community health files: `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
+- Added a `Community` section in `README.md` linking code of conduct, contributing guide, and security policy.
+
 ## [0.1.0] - 2026-03-30
 
 ### Added

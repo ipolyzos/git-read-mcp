@@ -145,6 +145,12 @@ make build
 | `internal/logging` | Logging |
 | `docs/` | Architecture, security, tools, releases |
 
+## Community
+
+- Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security policy: [SECURITY.md](SECURITY.md)
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
