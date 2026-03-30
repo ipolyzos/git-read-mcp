@@ -14,7 +14,22 @@ Git operations run via `internal/execx` with the following hardening:
 
 These rules apply to the future Git adapter: subprocess arguments must remain allowlisted at a higher layer (`internal/git` + `internal/validate`); `execx` enforces resource limits only.
 
+## Input and path validation
+
+`internal/validate` enforces repository scoping and basic input size/range checks before any Git subprocess runs:
+
+| Control | Behavior |
+|---------|----------|
+| **Repository root** | `NormalizeRepoPath` requires `repo_path` to exist as a directory (symlink targets are canonicalized when readable). |
+| **Resolution** | `ResolvePath` joins relative user paths to the normalized repo root; absolute inputs are accepted as-is after `filepath.Clean`, so callers must apply the right “within repo” policy afterward. |
+| **Traversal** | `EnsureWithinRepo` rejects paths whose cleaned absolute form escapes the repo root (string prefix / `filepath.Rel` checks). |
+| **Existence** | `EnsurePathExists` validates file vs directory expectations for paths that must be present on disk (e.g. directory diff inputs). |
+| **Limits** | `MaxStringBytes`, `IntInRange`, and `BoolDefault` centralize caps and defaults for tool arguments. |
+
+Path comparisons do not follow symlinks inside the repository when checking containment; a symlink fully inside the repo that points elsewhere may bypass naive prefix checks when tools open the path. Treat symlink-heavy trees as higher risk; tightening that belongs with future path canonicalization work.
+
 ## Future work
 
 - Path and argument allowlists for `git` subcommands and flags.
+- Optional symlink-expanded containment checks for high-risk tools.
 - Redaction or caps on error text returned to MCP clients.
