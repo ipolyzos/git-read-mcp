@@ -112,9 +112,9 @@ func TestParseUnified_maxFiles(t *testing.T) {
 	var sb strings.Builder
 	for i := range 5 {
 		sb.WriteString("diff --git a/f")
-		sb.WriteString(string(rune('0'+i)))
+		sb.WriteString(string(rune('0' + i)))
 		sb.WriteString(".go b/f")
-		sb.WriteString(string(rune('0'+i)))
+		sb.WriteString(string(rune('0' + i)))
 		sb.WriteString(".go\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n")
 	}
 	o := Options{MaxDiffBytes: 1 << 20, MaxFiles: 2, MaxHunks: 100}

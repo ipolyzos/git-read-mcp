@@ -31,8 +31,8 @@ func TestValidateSummarizeDiffInput_pathsOK(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := ValidateSummarizeDiffInput(SummarizeDiffInput{
-		RepoPath: repo,
-		LeftPath: "l.txt",
+		RepoPath:  repo,
+		LeftPath:  "l.txt",
 		RightPath: "r.txt",
 	})
 	if err != nil {

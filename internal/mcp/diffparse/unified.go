@@ -23,13 +23,13 @@ func DefaultOptions() Options {
 
 // FileChange aggregates per-file statistics.
 type FileChange struct {
-	Path        string `json:"path"`
-	OldPath     string `json:"old_path,omitempty"`
-	Rename      bool   `json:"rename,omitempty"`
-	Binary      bool   `json:"binary,omitempty"`
-	Insertions  int    `json:"insertions"`
-	Deletions   int    `json:"deletions"`
-	Hunks       int    `json:"hunks"`
+	Path       string `json:"path"`
+	OldPath    string `json:"old_path,omitempty"`
+	Rename     bool   `json:"rename,omitempty"`
+	Binary     bool   `json:"binary,omitempty"`
+	Insertions int    `json:"insertions"`
+	Deletions  int    `json:"deletions"`
+	Hunks      int    `json:"hunks"`
 }
 
 // Result is the outcome of ParseUnified.
@@ -44,10 +44,10 @@ type Result struct {
 
 type fileAcc struct {
 	path, oldPath string
-	rename         bool
-	binary         bool
-	ins, del       int
-	hunks          int
+	rename        bool
+	binary        bool
+	ins, del      int
+	hunks         int
 }
 
 func (f *fileAcc) toChange() FileChange {
