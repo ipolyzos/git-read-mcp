@@ -18,8 +18,8 @@ func InstallBuiltins(srv *mcpsdk.Server) error {
 		Description: "Compare two files inside a repository using git diff --no-index (read-only).",
 	}, HandleDiffFiles)
 	mcpsdk.AddTool(srv, &mcpsdk.Tool{
-		Name:        apimcp.ToolNameCompareText,
-		Description: "Compare two text blobs using a private temp directory and git diff --no-index; repo_path is not written.",
-	}, HandleCompareText)
+		Name:        apimcp.ToolNameDiffDirectories,
+		Description: "Compare two directory trees using git diff --no-index (read-only). Relative paths resolve from repo_path; absolute paths may be outside the repo.",
+	}, HandleDiffDirectories)
 	return nil
 }
