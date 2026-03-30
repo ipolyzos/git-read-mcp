@@ -75,7 +75,7 @@ Stable **`code`** values include: `INVALID_ARGUMENT`, `NOT_FOUND`, `TIMEOUT`, `T
 
 ## Tool: `diff_files`
 
-**Name:** `diff_files`  
+**Name:** `diff_files`
 
 **Purpose:** Read-only comparison of two **files** under a repository root using `git diff --no-index`.
 
@@ -146,7 +146,7 @@ When both files are identical, git exits `0`: `had_diff` is **`false`**, **`diff
 
 ## Tool: `diff_directories`
 
-**Name:** `diff_directories`  
+**Name:** `diff_directories`
 
 **Purpose:** Read-only recursive comparison of two **directories** using `git diff --no-index`. Git walks both trees and emits a unified diff (requires a Git version that supports directory operands with `--no-index`, e.g. recent 2.x).
 
