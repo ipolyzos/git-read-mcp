@@ -19,12 +19,12 @@ var diffDirMaxOutputOverride int64
 func HandleDiffDirectories(ctx context.Context, req *mcpsdk.CallToolRequest, in apimcp.DiffDirectoriesInput) (*mcpsdk.CallToolResult, apimcp.DiffDirectoriesOutput, error) {
 	_, leftAbs, rightAbs, err := apimcp.ValidateAndResolveDiffDirectories(in)
 	if err != nil {
-		return nil, apimcp.DiffDirectoriesOutput{}, err
+		return nil, apimcp.DiffDirectoriesOutput{}, mapToolError(apimcp.ToolNameDiffDirectories, req, err)
 	}
 
 	ignore, err := apimcp.ParseIgnoreWhitespace(in.IgnoreWhitespace)
 	if err != nil {
-		return nil, apimcp.DiffDirectoriesOutput{}, err
+		return nil, apimcp.DiffDirectoriesOutput{}, mapToolError(apimcp.ToolNameDiffDirectories, req, err)
 	}
 
 	ctxN := in.ContextLines
@@ -48,7 +48,7 @@ func HandleDiffDirectories(ctx context.Context, req *mcpsdk.CallToolRequest, in 
 			out.Truncated = true
 			return nil, out, nil
 		}
-		return nil, apimcp.DiffDirectoriesOutput{}, err
+		return nil, apimcp.DiffDirectoriesOutput{}, mapToolError(apimcp.ToolNameDiffDirectories, req, err)
 	}
 	if !out.Truncated {
 		out.Stats = apimcp.DiffLineStatsFromUnifiedDiff(out.Diff)

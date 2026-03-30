@@ -11,6 +11,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/ipolyzos/git-read-mcp/internal/config"
 	gitreadmcp "github.com/ipolyzos/git-read-mcp/internal/mcp"
 	"github.com/ipolyzos/git-read-mcp/internal/mcp/handlers"
 )
@@ -19,6 +20,10 @@ func main() {
 	log.SetOutput(os.Stderr)
 	log.SetPrefix("git-read-mcp: ")
 	log.SetFlags(log.LstdFlags)
+
+	if err := config.LoadFromEnv(); err != nil {
+		log.Fatalf("config: %v", err)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

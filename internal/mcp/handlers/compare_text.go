@@ -34,12 +34,12 @@ func mkdirTempForCompare() (string, error) {
 // never modified; repo_path is validated only.
 func HandleCompareText(ctx context.Context, req *mcpsdk.CallToolRequest, in apimcp.CompareTextInput) (*mcpsdk.CallToolResult, apimcp.CompareTextOutput, error) {
 	if err := apimcp.ValidateCompareTextInput(in); err != nil {
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 
 	ignore, err := apimcp.ParseIgnoreWhitespace(in.IgnoreWhitespace)
 	if err != nil {
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 
 	ctxN := in.ContextLines
@@ -50,17 +50,17 @@ func HandleCompareText(ctx context.Context, req *mcpsdk.CallToolRequest, in apim
 
 	dir, err := mkdirTempForCompare()
 	if err != nil {
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	leftPath := filepath.Join(dir, "left.txt")
 	rightPath := filepath.Join(dir, "right.txt")
 	if err := os.WriteFile(leftPath, []byte(in.LeftText), 0o600); err != nil {
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 	if err := os.WriteFile(rightPath, []byte(in.RightText), 0o600); err != nil {
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 
 	gitRes, err := git.DiffNoIndex(ctx, leftPath, rightPath, opts)
@@ -75,7 +75,7 @@ func HandleCompareText(ctx context.Context, req *mcpsdk.CallToolRequest, in apim
 			out.Truncated = true
 			return nil, out, nil
 		}
-		return nil, apimcp.CompareTextOutput{}, err
+		return nil, apimcp.CompareTextOutput{}, mapToolError(apimcp.ToolNameCompareText, req, err)
 	}
 	if !out.Truncated {
 		out.Stats = apimcp.DiffLineStatsFromUnifiedDiff(out.Diff)

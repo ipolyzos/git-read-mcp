@@ -1,2 +1,2 @@
-// Package errors defines typed errors and helpers for mapping exec and MCP failures.
+// Package errors defines typed errors, stable Code values, and Map for tool-safe JSON errors.
 package errors
