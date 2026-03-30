@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-30
+
 ### Added
 - New MCP tool `summarize_diff` with structured diff summaries (files, insertions, deletions, hunks) from either inline unified diff input or computed file-path diffs.
 - Full built-in registration for `compare_text` in server tool installation.
