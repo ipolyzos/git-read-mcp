@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Build and archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          REF_NAME="${{ github.ref_name }}"
+          VERSION_NUM="${REF_NAME#v}"
+          mkdir -p dist out
+          BIN="git-read-mcp"
+          if [ "$GOOS" = "windows" ]; then BIN="git-read-mcp.exe"; fi
+          go build -trimpath -buildvcs=false \
+            -ldflags="-s -w -X github.com/ipolyzos/git-read-mcp/cmd/server.releaseVersion=${VERSION_NUM}" \
+            -o "out/${BIN}" ./cmd/server
+          ASSET="git-read-mcp_${REF_NAME}_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            ( cd out && zip -q "../dist/${ASSET}.zip" "${BIN}" )
+          else
+            chmod +x "out/${BIN}"
+            tar -C out -czvf "dist/${ASSET}.tar.gz" "${BIN}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asset-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: asset-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd release-assets
+          shopt -s nullglob
+          files=( *.tar.gz *.zip )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no release archives found" >&2
+            exit 1
+          fi
+          printf '%s\n' "${files[@]}" | sort | xargs sha256sum > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
