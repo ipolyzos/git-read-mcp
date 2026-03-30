@@ -37,6 +37,42 @@ Protocol-level faults (bad JSON-RPC framing, unsupported methods) remain the SDK
 
 `RunStdio(ctx, impl, registry, installers...)` constructs `mcpsdk.NewServer`, applies `InstallTools` for the registry, runs optional `installers` (such as `handlers.InstallBuiltins`), then blocks on `StdioTransport` until the process is stopped or the client disconnects.
 
+## MCP invocation and responses
+
+### JSON-RPC params (what you send)
+
+Built-ins are invoked with **`tools/call`**. The **`params`** object contains the tool **`name`** and an **`arguments`** object (the tables in each section below define valid keys).
+
+```json
+{
+  "name": "diff_files",
+  "arguments": {
+    "repo_path": "/absolute/path/to/repo",
+    "left_path": "relative/or/absolute/file",
+    "right_path": "relative/or/absolute/file",
+    "context_lines": 3,
+    "ignore_whitespace": "none"
+  }
+}
+```
+
+### Successful result
+
+For typed tools, the SDK surfaces **`structuredContent`** with the same shape as the Go output struct (JSON object). There is often a companion **text** `content` block mirroring that JSON. Downstream automation should prefer **`structuredContent`** when available.
+
+### Tool error result (`isError: true`)
+
+Handlers map failures to a JSON object in **text** content (one line), for example:
+
+```json
+{
+  "code": "NOT_FOUND",
+  "message": "validate: path \"/tmp/missing\": open /tmp/missing: no such file or directory"
+}
+```
+
+Stable **`code`** values include: `INVALID_ARGUMENT`, `NOT_FOUND`, `TIMEOUT`, `TOO_LARGE`, `GIT_ERROR`, `INTERNAL`. See [troubleshooting.md](troubleshooting.md) for operator-visible stderr logs.
+
 ## Tool: `diff_files`
 
 **Name:** `diff_files`  
@@ -75,6 +111,31 @@ Relative paths are resolved with `ResolvePath`; both sides must pass `EnsureWith
   "ignore_whitespace": "none"
 }
 ```
+
+### Sample structured output (success)
+
+When files differ and output is not truncated (`had_diff: true`):
+
+```json
+{
+  "diff": "diff --git a/pkg/foo.go b/pkg/bar.go\n--- a/pkg/foo.go\n+++ b/pkg/bar.go\n@@ -1,3 +1,3 @@\n package pkg\n-var x = 1\n+var x = 2\n const y = 3\n",
+  "truncated": false,
+  "had_diff": true,
+  "stats": {
+    "insertions": 1,
+    "deletions": 1
+  }
+}
+```
+
+When both files are identical, git exits `0`: `had_diff` is **`false`**, **`diff`** is typically empty, and **`stats`** may reflect zeros.
+
+### Limitations and practices (`diff_files`)
+
+- **`stats`** is omitted when **`truncated`** is `true` (partial diff).
+- **`insertions` / `deletions`** are line counts from the unified diff body (not `git --numstat`).
+- Use **`context_lines: 0`** to minimize hunk size on huge files; raise only when you need surrounding lines.
+- Absolute paths must still lie **inside** `repo_path` after resolution.
 
 ### Safety
 
@@ -130,6 +191,27 @@ Same shape as `diff_files`: `diff`, `truncated`, `had_diff`, `stats` (stats omit
 ```
 
 Here `repo_path` still must be a valid directory (anchor for resolution); the compared trees live at the absolute paths.
+
+### Sample structured output (success)
+
+Same keys as `diff_files`. Example when trees differ (body abbreviated):
+
+```json
+{
+  "diff": "diff --git a/baseline/pkg/x.go b/current/pkg/x.go\n--- a/baseline/pkg/x.go\n+++ b/current/pkg/x.go\n@@ -1 +1 @@\n-foo\n+bar\n",
+  "truncated": false,
+  "had_diff": true,
+  "stats": { "insertions": 1, "deletions": 1 }
+}
+```
+
+Large trees often hit **`truncated: true`**, with **`stats`** omitted; narrow the tree or increase **`GIT_READ_MCP_MAX_OUTPUT_BYTES`** ([troubleshooting.md](troubleshooting.md)).
+
+### Limitations and practices (`diff_directories`)
+
+- **Wider blast radius than `diff_files`**: absolute operands can point **anywhere** on disk—supply only trusted paths.
+- Diff **size** grows with tree size; prefer comparing **subtrees** when possible.
+- Requires a Git build that supports **directory** operands with **`--no-index`**.
 
 ### Safety
 
@@ -191,6 +273,33 @@ Computed (equivalent policy to `diff_files`):
 }
 ```
 
+### Sample structured output (success, inline mode)
+
+```json
+{
+  "summary": "1 file(s), +1 / -1 lines, 1 hunks (approx). Source: inline diff.",
+  "files": [
+    {
+      "path": "foo.go",
+      "insertions": 1,
+      "deletions": 1,
+      "hunks": 1
+    }
+  ],
+  "totals": {
+    "files": 1,
+    "insertions": 1,
+    "deletions": 1,
+    "hunks": 1
+  },
+  "diff_source": "inline",
+  "input_truncated": false,
+  "parse_truncated": false
+}
+```
+
+(Rename or binary entries set **`rename`**: true or **`binary`**: true and may clear line-level counts.)
+
 ### Limitations
 
 - **Counts are approximate**: they come from a line scan over unified diff text (like counting `+`/`-` in hunks, excluding `+++` / `---` lines). They are not a full Git numstat.
@@ -198,15 +307,31 @@ Computed (equivalent policy to `diff_files`):
 - **Binary files**: lines of the form `Binary files … differ` mark the file as binary with **no** line-level insertions/deletions.
 - **Truncation**: `input_truncated` / `parse_truncated` / `git_diff_truncated` mean the summary may be **incomplete**; callers should not assume full coverage without checking those flags.
 
+### Best practices (`summarize_diff`)
+
+- Prefer **`summarize_diff`** over hauling huge **`diff`** payloads through the model when you only need **file lists and rough +/- counts**.
+- Tighten **`max_hunks`** / **`max_files`** when feeding **machine-generated** or **untrusted** diff text to cap CPU.
+- Inline **`diff`** longer than the effective **`max_diff_bytes`** is **rejected** (not silently truncated) at validation time—shrink input or raise the cap within documented hard limits.
+- For path mode, policy matches **`diff_files`** (containment + existing files).
+
 ### Safety
 
 - **Path mode** inherits the same containment and argv discipline as `diff_files` (no shell; operands only after `--`).
 - Inline mode parses **only** the supplied string (capped by `max_diff_bytes` for parsing); oversized inline input is rejected up front.
 
-## Validation rules (other planned tools)
+## Cross-tool best practices
 
-| Tool / mode | Path policy |
-|-------------|-------------|
-| **`compare_text`** | Operates on temporary/buffer-backed inputs supplied by the host; **no repo containment** on those payloads beyond verifying `repo_path` exists (for context) via `NormalizeRepoPath`. Do not accept user filesystem paths for compare blobs. |
+| Topic | Recommendation |
+|-------|----------------|
+| **Outputs** | Always inspect **`truncated`** (and summarize_diff’s **`input_truncated`** / **`parse_truncated`** / **`git_diff_truncated`**) before assuming a full diff or full file list. |
+| **Context** | Lower **`context_lines`** for very large files or noisy diffs; raise only when context is required for review. |
+| **Paths** | Use **relative** paths under **`repo_path`** for `diff_files` / `summarize_diff` (path mode) to avoid accidental leaks of absolute paths in configs. |
+| **Directories** | Treat **`diff_directories`** with absolute paths like **direct file access**—only enable for trusted clients or constrained hosts. |
+| **Errors** | Parse tool error JSON **`code`** for recovery (`NOT_FOUND` vs `TIMEOUT` vs `GIT_ERROR`). |
+| **Secrets** | Do not paste tokens into **`repo_path`** or path fields if logs or error messages might echo them. |
 
-Cross-cutting limits (description length, integer bounds, booleans) should use `internal/validate` helpers so MCP schemas and runtime checks stay aligned.
+## Other tools (`compare_text`)
+
+The **`compare_text`** handler compares in-memory strings via a temp dir + `git diff --no-index`. It may not be registered in all builds; when present, **`repo_path`** is validated for context only—payloads are not written under the repo. Arguments and limits are defined in **`internal/mcp/compare_text_schema.go`** (`left_text` / `right_text` caps, `context_lines`, `ignore_whitespace`). Same subprocess and truncation semantics as other diff tools.
+
+Cross-cutting limits (string byte caps, integer bounds) use **`internal/validate`** helpers so MCP schemas and runtime checks stay aligned.
