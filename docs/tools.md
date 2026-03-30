@@ -40,3 +40,15 @@ Protocol-level faults (bad JSON-RPC framing, unsupported methods) remain the SDK
 ## Current status
 
 The registry ships **empty**: no Git-backed tools are registered yet. Adding a tool is: implement `ToolHandler`, `Register`, ensure `RunStdio` receives that registry.
+
+## Validation rules (planned tools)
+
+All tools that touch the filesystem should call `NormalizeRepoPath` once per request for `repo_path`. Additional rules depend on the tool:
+
+| Tool / mode | Path policy |
+|-------------|-------------|
+| **`diff_files`**, **`summarize_diff` (file mode)** | Resolve user file paths with `ResolvePath(repo, userPath)`, then **`EnsureWithinRepo(repo, resolved)`**. Require files to exist when the diff requires readable blobs. |
+| **`diff_directories`** | Paths may target arbitrary directories, but **`EnsurePathExists(dir, true)`** must succeed after resolution. Default: resolve relative paths with `ResolvePath`; absolute paths are accepted as-is after cleaning, **without** `EnsureWithinRepo`, so callers can compare directories outside the repo when explicitly specified. |
+| **`compare_text`** | Operates on temporary/buffer-backed inputs supplied by the host; **no repo containment** on those payloads beyond verifying `repo_path` exists (for context) via `NormalizeRepoPath`. Do not accept user filesystem paths for compare blobs. |
+
+Cross-cutting limits (description length, integer bounds, booleans) should use `internal/validate` helpers so MCP schemas and runtime checks stay aligned.
