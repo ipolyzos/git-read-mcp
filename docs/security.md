@@ -28,6 +28,16 @@ These rules apply to the future Git adapter: subprocess arguments must remain al
 
 Path comparisons do not follow symlinks inside the repository when checking containment; a symlink fully inside the repo that points elsewhere may bypass naive prefix checks when tools open the path. Treat symlink-heavy trees as higher risk; tightening that belongs with future path canonicalization work.
 
+## Ephemeral files (`compare_text`)
+
+| Aspect | Behavior |
+|--------|----------|
+| **Location** | Each invocation creates a dedicated directory via `os.MkdirTemp` with prefix `git-read-mcp-compare-*` (host default temp location, or a test-controlled parent when `compare_text` tests run). The directory is created with restrictive permissions on supported platforms (e.g. `0700` on Unix). |
+| **Contents** | Only two fixed filenames are written: `left.txt` and `right.txt`, containing the decoded `left_text` / `right_text` arguments. User input never appears in path segments. |
+| **Repository** | `repo_path` is validated with `NormalizeRepoPath` so callers anchor context to a real tree; **nothing is written under `repo_path`** for this tool. |
+| **Size limits** | Each text operand is capped at **200 KiB** (`MaxCompareTextBytes`) before any file write to bound disk and memory use. |
+| **Cleanup** | After `git diff --no-index` completes (success, tool error, or failed diff), the handler runs `os.RemoveAll` on the temp directory in a `defer`. This is **best-effort**: abrupt process termination may leave directories behind until the OS cleans temp space. No background sweeper is implemented. |
+
 ## Future work
 
 - Path and argument allowlists for `git` subcommands and flags.

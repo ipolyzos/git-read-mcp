@@ -24,7 +24,7 @@ Handlers use the SDK’s low-level type `mcpsdk.ToolHandler`:
 func(context.Context, *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error)
 ```
 
-Built-in tools (for example `diff_files`) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` (for example `DiffFilesInput` / `DiffFilesOutput`) so JSON schema is inferred by the SDK.
+Built-in tools (`diff_files`, `compare_text`, …) are registered with the SDK’s generic `mcpsdk.AddTool` from `internal/mcp/handlers` and are passed into `RunStdio` via installer callbacks. Typed inputs/outputs live in `internal/mcp` so JSON schema is inferred by the SDK.
 
 ## Result envelope helpers
 
@@ -83,12 +83,50 @@ Relative paths are resolved with `ResolvePath`; both sides must pass `EnsureWith
 - Git environment uses pager suppression and `GIT_TERMINAL_PROMPT=0` (see `internal/git` and `docs/architecture.md`).
 - Truncation returns a tool success with `truncated: true` and partial `diff`; timeouts and unexpected git exits surface as errors.
 
+## Tool: `compare_text`
+
+**Name:** `compare_text`  
+
+**Purpose:** Compare two **text blobs** in-process by writing them to a private temp directory and running `git diff --no-index`. The repository at `repo_path` is **not modified**; it exists only to satisfy validation/context (same as the planned “buffer-backed” design in earlier docs).
+
+### Inputs (JSON)
+
+| Field | Type | Constraints |
+|-------|------|-------------|
+| `repo_path` | string | Must exist as a directory (`NormalizeRepoPath`). No files are created there. |
+| `left_text` | string | UTF-8 text; **≤ 200 KiB** byte length. |
+| `right_text` | string | Same cap. |
+| `context_lines` | int | `0`–`50`. |
+| `ignore_whitespace` | string (optional) | Same as `diff_files`. |
+
+### Outputs (structured)
+
+Same fields as `diff_files`: `diff`, `truncated`, `had_diff`, `stats` (stats omitted when output is truncated in the handler).
+
+### Example
+
+```json
+{
+  "repo_path": "/home/you/project",
+  "left_text": "func main() {\n  println(\"a\")\n}\n",
+  "right_text": "func main() {\n  println(\"b\")\n}\n",
+  "context_lines": 3,
+  "ignore_whitespace": "none"
+}
+```
+
+### Safety
+
+- Blobs never touch the working tree under `repo_path`; see `docs/security.md` for temp directory behavior and cleanup guarantees.
+- Input size caps reduce abuse and accidental huge payloads.
+- Git invocation uses the same allowlisted argv as other diff tools.
+
 ## Validation rules (other planned tools)
 
 | Tool / mode | Path policy |
 |-------------|-------------|
 | **`summarize_diff` (file mode)** | Same as `diff_files`: within repo, files must exist. |
 | **`diff_directories`** | Paths may target arbitrary directories, but **`EnsurePathExists(dir, true)`** must succeed after resolution. Default: resolve relative paths with `ResolvePath`; absolute paths are accepted as-is after cleaning, **without** `EnsureWithinRepo`, so callers can compare directories outside the repo when explicitly specified. |
-| **`compare_text`** | Operates on temporary/buffer-backed inputs supplied by the host; **no repo containment** on those payloads beyond verifying `repo_path` exists (for context) via `NormalizeRepoPath`. Do not accept user filesystem paths for compare blobs. |
+| **`compare_text`** | Implemented above: temp files only; **`repo_path`** is context-only (validated, never written). |
 
 Cross-cutting limits (description length, integer bounds, booleans) should use `internal/validate` helpers so MCP schemas and runtime checks stay aligned.
