@@ -21,5 +21,9 @@ func InstallBuiltins(srv *mcpsdk.Server) error {
 		Name:        apimcp.ToolNameDiffDirectories,
 		Description: "Compare two directory trees using git diff --no-index (read-only). Relative paths resolve from repo_path; absolute paths may be outside the repo.",
 	}, HandleDiffDirectories)
+	mcpsdk.AddTool(srv, &mcpsdk.Tool{
+		Name:        apimcp.ToolNameSummarizeDiff,
+		Description: "Summarize a unified diff: file list, approximate +/- lines and hunk counts. Pass diff text or repo_path+left_path+right_path (same rules as diff_files) to compute via git diff --no-index.",
+	}, HandleSummarizeDiff)
 	return nil
 }
